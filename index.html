@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Materials Analyzer Pro</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        /* CSS Chuẩn Giao diện Ứng dụng */
+        :root {
+            --bg: #f3f4f6;
+            --surface: #ffffff;
+            --primary: #2563eb;
+            --text: #1f2937;
+            --border: #e5e7eb;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Cột Sidebar (Khóa chặt độ rộng) */
+        .sidebar {
+            width: 360px;
+            min-width: 360px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+            z-index: 10;
+        }
+
+        .app-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            background: #1e293b;
+            color: white;
+        }
+
+        .app-header h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .panel {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .panel-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #6b7280;
+            margin-bottom: 12px;
+            display: block;
+            letter-spacing: 0.5px;
+        }
+
+        label {
+            font-size: 13px;
+            font-weight: 500;
+            display: block;
+            margin-bottom: 4px;
+            color: #374151;
+        }
+
+        input[type="number"],
+        input[type="file"],
+        select,
+        textarea,
+        input[type="text"] {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: monospace;
+            font-size: 13px;
+            margin-bottom: 10px;
+            background: #f9fafb;
+            transition: border 0.2s;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: #fff;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .col {
+            flex: 1;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            width: 100%;
+            font-size: 14px;
+            transition: background 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        /* Vùng hiển thị đồ thị (Tự động chiếm phần vi trí còn lại) */
+        .main-workspace {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+            overflow: hidden;
+        }
+
+        #plot-container {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+            overflow: hidden;
+        }
+
+        .result-box {
+            background: #ecfdf5;
+            border: 1px solid #10b981;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        #bandgapOutput {
+            font-size: 16px;
+            font-weight: bold;
+            color: #047857;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="toast-container"></div>
+    <div class="sidebar">
+        <div class="app-header">
+            <h2>⚛️ Materials Analyzer Pro</h2>
+            <select id="engineSelect"
+                style="margin-top: 15px; width: 100%; padding: 8px; border-radius: 4px; font-weight: bold;">
+                <option value="qe">1. QE (Band + DOS)</option>
+                <option value="w90">2. W90 (Band + DOS)</option>
+                <option value="pdos">3. QE - PDOS Analyzer</option>
+                <option value="optical">4. QE - Optical Properties</option>
+                <option value="optical_w90">5. W90 - Optical Properties</option>
+                <option value="bader">6. Bader-Charge Transfer</option>
+                <option value="contour">7. 2D Charge Density </option>
+            </select>
+        </div>
+
+        <div id="workspace-qe" style="display: block;">
+            <div class="panel" style="background: #fdfaf6; border-left: 3px solid #10b981;">
+                <span class="panel-title">2. Tự động trích xuất (QE)</span>
+                <label style="color: #047857; font-size: 11px;">A. Lấy Fermi (scf / nscf.out):</label>
+                <input type="file" id="qeFermiInput" accept=".out, .txt">
+                <label style="color: #047857; font-size: 11px; margin-top: 5px;">B. Lấy K-points (bands.pp.out):</label>
+                <input type="file" id="qeKptInput" accept=".out, .txt">
+            </div>
+            <div class="panel" style="border-left: 3px solid #10b981;">
+                <span class="panel-title">3. Dữ liệu Đầu vào (QE)</span>
+                <label>Upload Band (.dat / .gnu):</label><input type="file" id="qeBandInput">
+                <label>Upload DOS (.dos):</label><input type="file" id="qeDosInput">
+            </div>
+            <div class="panel" style="border-left: 3px solid #10b981;">
+                <span class="panel-title">4. Tùy chỉnh Đồ thị (QE)</span>
+                <label>Mức Fermi (E<sub>F</sub>) (eV):</label><input type="number" id="qeFermiVal" value="0.0"
+                    step="0.0001">
+                <div class="row">
+                    <div class="col"><label>Y Min:</label><input type="number" id="qeYMin" value="-6"></div>
+                    <div class="col"><label>Y Max:</label><input type="number" id="qeYMax" value="6"></div>
+                </div>
+                <div
+                    style="background: #f0fdf4; padding: 12px; border-radius: 8px; margin-top: 20px; border: 1px solid #86efac; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    <label
+                        style="color: #166534; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 5px;">
+                        📐 Khối Lượng Hiệu Dụng (m<sup>*</sup>)
+                    </label>
+                    <p style="font-size: 11px; color: #15803d; margin-top: 4px; margin-bottom: 12px; line-height: 1.4;">
+                        *Thuật toán sẽ
+                        dò tìm VBM/CBM, nội suy Parabol và tính m<sup>*</sup> tự động.</p>
+
+                    <button id="calcMassBtn"
+                        style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(16, 185, 129, 0.3); width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px;">
+                        <span style="font-size: 16px;">🚀</span> Tự động tính <i>m</i><sup>*</sup><sub
+                            style="margin-left: -3px;">e</sub> và
+                        <i>m</i><sup>*</sup><sub style="margin-left: -3px;">h</sub>
+                    </button>
+
+                    <div id="massResultArea" style="display: none;"></div>
+                </div>
+                <div class="row" style="margin-bottom: 10px;">
+                    <div class="col"><label>Màu Band:</label><input type="color" id="qeBandColor" value="#000000"></div>
+                    <div class="col"><label>Màu DOS:</label><input type="color" id="qeDosColor" value="#2563eb"></div>
+                </div>
+                <label>K-Points (High-Symmetry):</label><textarea id="qeKptText" rows="4"></textarea>
+                <button id="qeUpdateBtn" style="background: #10b981;">CẬP NHẬT ĐỒ THỊ</button>
+                <div class="result-box" id="qeResultBox" style="display: none;">
+                    <p id="qeGapType" style="font-size: 12px; color: #666; margin-bottom: 2px;"></p>
+                    <p id="qeGapOutput" style="font-size: 16px; font-weight: bold; color: #047857; margin: 0;"></p>
+                    <button id="qeDrawGapBtn"
+                        style="margin-top: 10px; background: #10b981; font-size: 12px; padding: 6px;">🎯 Kẻ
+                        HOMO-LUMO</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="workspace-w90" style="display: none;">
+            <div class="panel" style="background: #eff6ff; border-left: 3px solid #3b82f6;">
+                <span class="panel-title">2. Tự động trích xuất (W90)</span>
+                <label style="color: #1d4ed8; font-size: 11px;">A. Lấy Fermi (nscf.out):</label>
+                <input type="file" id="w90FermiInput" accept=".out, .txt">
+                <label style="color: #1d4ed8; font-size: 11px; margin-top: 5px;">B. Lấy K-points
+                    (labelinfo.dat):</label>
+                <input type="file" id="w90KptInput" accept=".dat, .txt">
+            </div>
+            <div class="panel" style="border-left: 3px solid #3b82f6;">
+                <span class="panel-title">3. Dữ liệu Đầu vào (W90)</span>
+                <label>Upload Band (wannier90_band.dat):</label><input type="file" id="w90BandInput">
+                <label>Upload DOS (wannier90_dos.dat):</label><input type="file" id="w90DosInput">
+            </div>
+            <div class="panel" style="border-left: 3px solid #3b82f6;">
+                <span class="panel-title">4. Tùy chỉnh Đồ thị (W90)</span>
+                <label>Mức Fermi (E<sub>F</sub>) (eV):</label><input type="number" id="w90FermiVal" value="0.0"
+                    step="0.0001">
+                <div class="row">
+                    <div class="col"><label>Y Min:</label><input type="number" id="w90YMin" value="-6"></div>
+                    <div class="col"><label>Y Max:</label><input type="number" id="w90YMax" value="6"></div>
+                </div>
+                <div
+                    style="background: #f0fdf4; padding: 12px; border-radius: 8px; margin-top: 20px; border: 1px solid #86efac; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    <label
+                        style="color: #166534; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 5px;">
+                        📐 Khối Lượng Hiệu Dụng (m<sup>*</sup>)
+                    </label>
+                    <p style="font-size: 11px; color: #15803d; margin-top: 4px; margin-bottom: 12px; line-height: 1.4;">
+                        *Thuật toán nội
+                        suy Parabol cho W90.</p>
+
+                    <button id="calcW90MassBtn"
+                        style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(16, 185, 129, 0.3); width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px;">
+                        <span style="font-size: 16px;">🚀</span> Tự động tính <i>m</i><sup>*</sup><sub
+                            style="margin-left: -3px;">e</sub> và
+                        <i>m</i><sup>*</sup><sub style="margin-left: -3px;">h</sub>
+                    </button>
+
+                    <div id="w90MassResultArea" style="display: none;"></div>
+                </div>
+                <div class="row" style="margin-bottom: 10px;">
+                    <div class="col"><label>Màu Band:</label><input type="color" id="w90BandColor" value="#000000">
+                    </div>
+                    <div class="col"><label>Màu DOS:</label><input type="color" id="w90DosColor" value="#dc2626"></div>
+                </div>
+                <label>K-Points (High-Symmetry):</label><textarea id="w90KptText" rows="4"></textarea>
+                <button id="w90UpdateBtn" style="background: #3b82f6;">CẬP NHẬT ĐỒ THỊ</button>
+                <div class="result-box" id="w90ResultBox" style="display: none;">
+                    <p id="w90GapType" style="font-size: 12px; color: #666; margin-bottom: 2px;"></p>
+                    <p id="w90GapOutput" style="font-size: 16px; font-weight: bold; color: #1d4ed8; margin: 0;"></p>
+                    <button id="w90DrawGapBtn"
+                        style="margin-top: 10px; background: #3b82f6; font-size: 12px; padding: 6px;">🎯 Kẻ
+                        HOMO-LUMO</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="workspace-pdos" style="display: none;">
+            <div class="panel" style="background: #fff1f2; border-left: 3px solid #e11d48;">
+                <span class="panel-title">2. Cài đặt Trục & Trích xuất (PDOS)</span>
+                <label style="color: #be123c; font-size: 11px;">A. Lấy Fermi tự động (scf / nscf.out):</label>
+                <input type="file" id="pdosAutoFermiInput" style="margin-bottom: 15px;">
+                <label>Mức Fermi (E<sub>F</sub>) (eV):</label>
+                <input type="number" id="pdosFermiInput" value="0.0" step="0.0001">
+                <div class="row">
+                    <div class="col"><label>E Min (X-axis):</label><input type="number" id="pdosXMin" value="-6"></div>
+                    <div class="col"><label>E Max (X-axis):</label><input type="number" id="pdosXMax" value="6"></div>
+                </div>
+            </div>
+
+            <div class="panel" style="border-left: 3px solid #e11d48;">
+                <span class="panel-title">3. Quản lý Dữ liệu PDOS</span>
+                <label style="color: #be123c;">1. Upload Total DOS (.dos):</label>
+                <input type="file" id="pdosTotalInput">
+                <div id="totalDosControlArea" style="margin-bottom: 15px;"></div>
+
+                <label style="color: #be123c; font-weight: bold;">2. Quét Thư mục (Folder) hoặc File:</label>
+                <input type="file" id="pdosFolderInput" webkitdirectory directory multiple
+                    title="Chọn thư mục chứa PDOS">
+                <input type="file" id="pdosMultiInput" multiple style="margin-top: 5px;">
+
+                <div
+                    style="background: #fdf2f8; padding: 10px; border-radius: 6px; margin-top: 15px; border: 1px solid #fda4af;">
+                    <label style="color: #be123c; font-size: 12px; font-weight: bold;">🪄 Chọn nhanh hàng loạt (Smart
+                        Select):</label>
+                    <div class="row" style="margin-top: 5px;">
+                        <select id="smartSelectDropdown" style="flex: 2; margin-bottom: 0;">
+                            <option value="">-- Chờ dữ liệu --</option>
+                        </select>
+                        <button id="smartSelectBtn"
+                            style="flex: 1; background: #be123c; padding: 6px; font-size: 12px;">Tích
+                            Chọn</button>
+                    </div>
+                    <button id="sumPdosBtn"
+                        style="background: #10b981; font-size: 12px; padding: 8px; margin-top: 10px;">➕ Gộp
+                        các PDOS đã chọn</button>
+
+                    <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #fda4af;">
+                        <label
+                            style="color: #be123c; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="pdosSpinMode" style="width: 18px; height: 18px;">
+                            🧲 Kích hoạt Chế độ Spin (Từ tính)
+                        </label>
+                        <p style="font-size: 11px; color: #881337; margin-top: 4px; margin-bottom: 0;">*Khi bật, phần
+                            mềm lấy
+                            Cột 2 làm Spin-Up, Cột 3 làm Spin-Down (đảo ngược y).</p>
+                    </div>
+                </div>
+
+                <div id="pdosControlArea"
+                    style="max-height: 250px; overflow-y: auto; margin-top: 10px; padding-right: 5px;">
+                </div>
+            </div>
+        </div>
+
+        <div id="workspace-optical" style="display: none;">
+            <div class="panel" style="background: #f3e8ff; border-left: 3px solid #9333ea;">
+                <span class="panel-title">1. Upload Dữ liệu Quang học</span>
+                <label style="color: #7e22ce;">1. Phần Thực epsr_*.dat (ε₁):</label>
+                <input type="file" id="optEpsrInput">
+                <label style="color: #7e22ce; margin-top: 5px;">2. Phần Ảo epsi_*.dat (ε₂):</label>
+                <input type="file" id="optEpsiInput">
+                <label style="color: #c026d3; margin-top: 5px; font-size: 11px;">3. Phổ EELS eels_*.dat (Tùy
+                    chọn):</label>
+                <input type="file" id="optEelsInput">
+            </div>
+            <div class="panel" style="border-left: 3px solid #9333ea;">
+                <span class="panel-title">2. Phân tích Vật lý</span>
+                <label>Loại phổ muốn vẽ:</label>
+                <select id="optPlotType"
+                    style="background: #fff; font-weight: bold; color: #9333ea; margin-bottom: 10px;">
+                    <option value="dielectric">Hằng số điện môi (ε₁ & ε₂)</option>
+                    <option value="absorption">Phổ hấp thụ (Absorption - α)</option>
+                    <option value="refractive">Chiết suất (n) & Dập tắt (k)</option>
+                    <option value="reflectivity">Độ phản xạ (Reflectivity - R)</option>
+                    <option value="eels">Phổ mất mát năng lượng (EELS)</option>
+                    <option value="tauc_direct">Tauc Plot (Direct Bandgap)</option>
+                    <option value="tauc_indirect">Tauc Plot (Indirect Bandgap)</option>
+                </select>
+                <div class="row" style="margin-bottom: 5px;">
+                    <div class="col"><label>Trục hoành (X):</label><select id="optXAxis">
+                            <option value="eV">Energy (eV)</option>
+                            <option value="nm">Wavelength (nm)</option>
+                        </select></div>
+                </div>
+                <div class="row" style="margin-bottom: 15px;">
+                    <div class="col"><label>X Min:</label><input type="number" id="optXMin" value="0"></div>
+                    <div class="col"><label>X Max:</label><input type="number" id="optXMax" value="15"></div>
+                </div>
+                <label>Bảng điều khiển Dị hướng (Anisotropy):</label>
+                <div id="optDirControlArea"
+                    style="background: #faf5ff; padding: 5px; border: 1px solid #d8b4fe; border-radius: 4px; max-height: 200px; overflow-y: auto;">
+                </div>
+                <button id="optDrawBtn" style="background: #9333ea; margin-top: 15px;">VẼ PHỔ QUANG HỌC</button>
+            </div>
+        </div>
+        <div id="workspace-optical_w90" style="display: none;">
+            <div class="panel" style="background: #e0e7ff; border-left: 3px solid #4f46e5;">
+                <span class="panel-title">1. Upload Folder Kubo (W90)</span>
+                <label style="color: #3730a3;">Quét Folder hoặc chọn nhiều file Kubo (*.dat) chứa σ(ω):</label>
+                <input type="file" id="w90OptKuboInput" webkitdirectory directory multiple
+                    title="Chọn thư mục chứa file Kubo">
+                <input type="file" id="w90OptMultiInput" multiple style="margin-top: 5px;" title="Hoặc chọn nhiều file">
+                <p style="font-size: 11px; color: #4f46e5; margin-top: 5px; margin-bottom: 0;">*Đọc 3 cột: Energy, Real
+                    σ₁ (cột
+                    2), Imaginary σ₂ (cột 3).</p>
+            </div>
+            <div class="panel" style="border-left: 3px solid #4f46e5;">
+                <span class="panel-title">2. Phân Tích & Tính Toán từ Kubo</span>
+                <label>Vật lý muốn tính & vẽ từ σ(ω):</label>
+                <select id="w90OptPlotType"
+                    style="background: #fff; font-weight: bold; color: #4f46e5; margin-bottom: 10px;">
+                    <option value="dielectric">Điện môi chuyển đổi (ε₁, ε₂)</option>
+                    <option value="absorption">Phổ hấp thụ (Absorption - α)</option>
+                    <option value="refractive">Chiết suất (n) & Dập tắt (k)</option>
+                    <option value="reflectivity">Độ phản xạ (Reflectivity - R)</option>
+                    <option value="eels">Phổ mất mát năng lượng (EELS)</option>
+                    <option value="tauc_direct">Tauc Plot (Direct Bandgap)</option>
+                    <option value="tauc_indirect">Tauc Plot (Indirect Bandgap)</option>
+                </select>
+                <div class="row" style="margin-bottom: 5px;">
+                    <div class="col"><label>Trục hoành (X):</label><select id="w90OptXAxis">
+                            <option value="eV">Energy (eV)</option>
+                            <option value="nm">Wavelength (nm)</option>
+                        </select></div>
+                </div>
+                <div class="row" style="margin-bottom: 15px;">
+                    <div class="col"><label>X Min:</label><input type="number" id="w90OptXMin" value="0"></div>
+                    <div class="col"><label>X Max:</label><input type="number" id="w90OptXMax" value="15"></div>
+                </div>
+
+                <label>Danh sách các hướng Kubo đã nạp:</label>
+                <button id="w90CalcAvgBtn"
+                    style="background: #10b981; font-size: 12px; padding: 8px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📊
+                    Tính Trung Bình Đẳng Hướng (xx, yy, zz)</button>
+
+                <label>Danh sách các hướng Kubo đã nạp:</label>
+                <div id="w90OptControlArea"
+                    style="background: #eef2ff; padding: 5px; border: 1px solid #c7d2fe; border-radius: 4px; max-height: 250px; overflow-y: auto;">
+                </div>
+                <div id="w90OptControlArea"
+                    style="background: #eef2ff; padding: 5px; border: 1px solid #c7d2fe; border-radius: 4px; max-height: 250px; overflow-y: auto;">
+                </div>
+            </div>
+        </div>
+        <div id="workspace-bader" style="display: none;">
+            <div class="panel" style="border-left: 3px solid #8b5cf6; background: #f5f3ff;">
+                <span class="panel-title" style="color: #6d28d9;">⚛️ Phân Tích Chuyển Giao Điện Tích (Bader)</span>
+
+                <p style="font-size: 12px; color: #5b21b6; margin-bottom: 15px;">
+                    * Thuật toán sẽ tự động tìm <b>ZVAL</b> và <b>Tên nguyên tử</b> từ file .out, sau đó tính <br><b>Δe
+                        = Charge
+                        (ACF) - ZVAL</b>.
+                </p>
+
+                <label style="color: #6d28d9; font-weight: bold; font-size: 13px;">1. Upload file scf.out / nscf.out
+                    (Lấy
+                    ZVAL):</label>
+                <input type="file" id="baderOutInput" accept=".out,.in,.txt" style="margin-bottom: 5px;">
+                <div id="baderOutStatus"
+                    style="font-size: 12px; color: #16a34a; margin-bottom: 15px; font-weight: bold;"></div>
+
+                <label style="color: #6d28d9; font-weight: bold; font-size: 13px;">2. Upload file ACF.dat (Kết quả
+                    Bader):</label>
+                <input type="file" id="baderAcfInput" accept=".dat,.txt" style="margin-bottom: 5px;">
+                <div id="baderAcfStatus"
+                    style="font-size: 12px; color: #16a34a; margin-bottom: 15px; font-weight: bold;"></div>
+
+                <button id="plotBaderBtn"
+                    style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; border: none; border-radius: 6px; padding: 10px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 3px 6px rgba(139, 92, 246, 0.3);">
+                    📊 Phân Tích & Vẽ Biểu Đồ Điện Tích
+                </button>
+            </div>
+        </div>
+        <div id="workspace-contour" style="display: none;">
+            <div class="panel" style="border-left: 3px solid #f59e0b; background: #fffbeb;">
+                <span class="panel-title" style="color: #b45309;">🗺️ Bản Đồ Mật Độ Điện Tích 2D</span>
+
+                <p style="font-size: 12px; color: #92400e; margin-bottom: 15px;">
+                    * Nạp file <b>.dat</b> xuất từ <b>pp.x</b> (QE)
+                </p>
+
+                <label style="color: #b45309; font-weight: bold; font-size: 13px;">1. Upload file Dữ liệu 2D
+                    (.dat):</label>
+                <input type="file" id="contourFileInput" accept=".dat,.txt" style="margin-bottom: 10px;">
+
+                <div class="row" style="margin-bottom: 15px;">
+                    <div class="col">
+                        <label style="color: #b45309; font-weight: bold; font-size: 12px;">Bảng Màu (Colormap):</label>
+                        <select id="contourColorMap"
+                            style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #fcd34d;">
+                            <option value="Jet"> Jet (Cổ điển - Total Charge)</option>
+                            <option value="RdBu">RdBu (Charge Difference)</option>
+                            <option value="Viridis"> Viridis (Chuẩn Khoa học mới)</option>
+                            <option value="Plasma"> Plasma (Tương phản cao)</option>
+                        </select>
+                    </div>
+                    <div class="col">
+                        <label style="color: #b45309; font-weight: bold; font-size: 12px;">Số đường mức
+                            (Contours):</label>
+                        <input type="number" id="contourLevels" value="30" min="10" max="100"
+                            style="width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #fcd34d;">
+                    </div>
+                </div>
+
+                <button id="plotContourBtn"
+                    style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; border-radius: 6px; padding: 10px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 3px 6px rgba(245, 158, 11, 0.3);">
+                    🌌 Vẽ Bản Đồ 2D Contour
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-workspace">
+        <div id="plot-container"></div>
+    </div>
+
+    <<script src="js/globals.js">
+        </script>
+        <script src="js/ui_nav.js"></script>
+        <script src="js/mod_band_qe.js"></script>
+        <script src="js/mod_band_w90.js"></script>
+        <script src="js/mod_pdos.js"></script>
+        <script src="js/mod_optical.js"></script>
+        <script src="js/mod_optical_w90.js"></script>
+        <script src="js/mod_bader.js"></script>
+        <script src="js/mod_contour.js"></script>
+
+        <style>
+            #toast-container {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 999999;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                pointer-events: none;
+            }
+
+            .modern-toast {
+                min-width: 250px;
+                max-width: 350px;
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(8px);
+                border-left: 5px solid #10b981;
+                border-radius: 6px;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+                padding: 14px 18px;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                transform: translateX(120%);
+                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                opacity: 0;
+                position: relative;
+                overflow: hidden;
+                font-family: 'Segoe UI', Tahoma, sans-serif;
+                font-size: 14px;
+                font-weight: 600;
+                color: #1f2937;
+            }
+
+            .modern-toast.show {
+                transform: translateX(0);
+                opacity: 1;
+            }
+
+            .modern-toast.error {
+                border-left-color: #ef4444;
+            }
+
+            .toast-progress {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                height: 3px;
+                background: #10b981;
+                transition: width 3s linear;
+                width: 100%;
+            }
+
+            .modern-toast.error .toast-progress {
+                background: #ef4444;
+            }
+        </style>
+
+        <div id="toast-container"></div>
+
+        <script>
+            // Ghi đè trực tiếp hàm alert của trình duyệt ngay tại HTML
+            window.alert = function (message) {
+                const container = document.getElementById('toast-container');
+                if (!container) return;
+
+                const isError = message.includes('❌');
+                const toast = document.createElement('div');
+                toast.className = `modern-toast ${isError ? 'error' : ''}`;
+
+                let icon = isError ? '❌' : '✅';
+                let cleanMsg = message.replace('❌', '').replace('✅', '').trim();
+
+                toast.innerHTML = `
+                    <span style="font-size: 20px;">${icon}</span>
+                    <span style="z-index: 1;">${cleanMsg}</span>
+                    <div class="toast-progress"></div>
+                `;
+
+                container.appendChild(toast);
+
+                // Trượt vào và chạy thanh tiến trình
+                setTimeout(() => {
+                    toast.classList.add('show');
+                    toast.querySelector('.toast-progress').style.width = '0%';
+                }, 10);
+
+                // Biến mất sau 3 giây
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => toast.remove(), 400);
+                }, 3000);
+            };
+        </script>
+
+</body>
+
+</html>
