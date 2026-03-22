@@ -174,7 +174,7 @@
     <div class="sidebar">
         <div class="app-header">
             <h2>⚛️ Materials Analyzer Pro</h2>
-            <select id="engineSelect"
+            <select id="engineSelect" onchange="showWorkspace('workspace-' + this.value)"
                 style="margin-top: 15px; width: 100%; padding: 8px; border-radius: 4px; font-weight: bold;">
                 <option value="qe">1. QE (Band + DOS)</option>
                 <option value="w90">2. W90 (Band + DOS)</option>
@@ -182,7 +182,7 @@
                 <option value="optical">4. QE - Optical Properties</option>
                 <option value="optical_w90">5. W90 - Optical Properties</option>
                 <option value="bader">6. Bader-Charge Transfer</option>
-                <option value="contour">7. 2D Charge Density </option>
+                <option value="contour">7. 2D Charge Density</option>
             </select>
         </div>
 
@@ -520,112 +520,128 @@
         <div id="plot-container"></div>
     </div>
 
-    <<script src="js/globals.js">
-        </script>
-        <script src="js/ui_nav.js"></script>
-        <script src="js/mod_band_qe.js"></script>
-        <script src="js/mod_band_w90.js"></script>
-        <script src="js/mod_pdos.js"></script>
-        <script src="js/mod_optical.js"></script>
-        <script src="js/mod_optical_w90.js"></script>
-        <script src="js/mod_bader.js"></script>
-        <script src="js/mod_contour.js"></script>
+    <script src="js/globals.js"></script>
+    <script src="js/ui_nav.js"></script>
+    <script src="js/mod_band_qe.js"></script>
+    <script src="js/mod_band_w90.js"></script>
+    <script src="js/mod_pdos.js"></script>
+    <script src="js/mod_optical.js"></script>
+    <script src="js/mod_optical_w90.js"></script>
+    <script src="js/mod_bader.js"></script>
+    <script src="js/mod_contour.js"></script>
 
-        <style>
-            #toast-container {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                z-index: 999999;
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
-                pointer-events: none;
-            }
+    <style>
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 999999;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            pointer-events: none;
+        }
 
-            .modern-toast {
-                min-width: 250px;
-                max-width: 350px;
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(8px);
-                border-left: 5px solid #10b981;
-                border-radius: 6px;
-                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-                padding: 14px 18px;
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                transform: translateX(120%);
-                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                opacity: 0;
-                position: relative;
-                overflow: hidden;
-                font-family: 'Segoe UI', Tahoma, sans-serif;
-                font-size: 14px;
-                font-weight: 600;
-                color: #1f2937;
-            }
+        .modern-toast {
+            min-width: 250px;
+            max-width: 350px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            border-left: 5px solid #10b981;
+            border-radius: 6px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transform: translateX(120%);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+            position: relative;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1f2937;
+        }
 
-            .modern-toast.show {
-                transform: translateX(0);
-                opacity: 1;
-            }
+        .modern-toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
 
-            .modern-toast.error {
-                border-left-color: #ef4444;
-            }
+        .modern-toast.error {
+            border-left-color: #ef4444;
+        }
 
-            .toast-progress {
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                height: 3px;
-                background: #10b981;
-                transition: width 3s linear;
-                width: 100%;
-            }
+        .toast-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: #10b981;
+            transition: width 3s linear;
+            width: 100%;
+        }
 
-            .modern-toast.error .toast-progress {
-                background: #ef4444;
-            }
-        </style>
+        .modern-toast.error .toast-progress {
+            background: #ef4444;
+        }
+    </style>
 
-        <div id="toast-container"></div>
+    <div id="toast-container"></div>
 
-        <script>
-            // Ghi đè trực tiếp hàm alert của trình duyệt ngay tại HTML
-            window.alert = function (message) {
-                const container = document.getElementById('toast-container');
-                if (!container) return;
+    <script>
+        // Ghi đè trực tiếp hàm alert của trình duyệt ngay tại HTML
+        window.alert = function (message) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
 
-                const isError = message.includes('❌');
-                const toast = document.createElement('div');
-                toast.className = `modern-toast ${isError ? 'error' : ''}`;
+            const isError = message.includes('❌');
+            const toast = document.createElement('div');
+            toast.className = `modern-toast ${isError ? 'error' : ''}`;
 
-                let icon = isError ? '❌' : '✅';
-                let cleanMsg = message.replace('❌', '').replace('✅', '').trim();
+            let icon = isError ? '❌' : '✅';
+            let cleanMsg = message.replace('❌', '').replace('✅', '').trim();
 
-                toast.innerHTML = `
+            toast.innerHTML = `
                     <span style="font-size: 20px;">${icon}</span>
                     <span style="z-index: 1;">${cleanMsg}</span>
                     <div class="toast-progress"></div>
                 `;
 
-                container.appendChild(toast);
+            container.appendChild(toast);
 
-                // Trượt vào và chạy thanh tiến trình
-                setTimeout(() => {
-                    toast.classList.add('show');
-                    toast.querySelector('.toast-progress').style.width = '0%';
-                }, 10);
+            // Trượt vào và chạy thanh tiến trình
+            setTimeout(() => {
+                toast.classList.add('show');
+                toast.querySelector('.toast-progress').style.width = '0%';
+            }, 10);
 
-                // Biến mất sau 3 giây
-                setTimeout(() => {
-                    toast.classList.remove('show');
-                    setTimeout(() => toast.remove(), 400);
-                }, 3000);
-            };
-        </script>
+            // Biến mất sau 3 giây
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }, 3000);
+        };
+    </script>
+    <script>
+        function showWorkspace(workspaceId) {
+            // 1. Quét tự động TẤT CẢ các thẻ div có ID bắt đầu bằng chữ "workspace-"
+            let allWorkspaces = document.querySelectorAll('[id^="workspace-"]');
+
+            // 2. Tắt (ẩn) toàn bộ chúng đi
+            allWorkspaces.forEach(ws => {
+                ws.style.display = 'none';
+            });
+
+            // 3. Chỉ bật (hiện) duy nhất cái mà bạn vừa bấm
+            let selectedEl = document.getElementById(workspaceId);
+            if (selectedEl) {
+                selectedEl.style.display = 'block';
+            }
+        }
+    </script>
 
 </body>
 
